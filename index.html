@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f5f1">
+  <meta name="description" content="Interaktive, sichere Erklärung der technischen Abläufe bei Man-in-the-Middle-Angriffen.">
+  <title>Technischer Ablauf eines MitM-Angriffs</title>
+  <style>
+    :root { color-scheme:light; --paper:#f6f5f1; --white:#fff; --navy:#15283f; --ink:#26384b; --muted:#637487; --red:#d9503e; --teal:#087f83; --line:#d9dfe2; --pale-red:#fbe9e5; --pale-teal:#e5f3f2; }
+    * { box-sizing:border-box }
+    body { margin:0; background:var(--paper); color:var(--navy); font:16px/1.5 Arial,Helvetica,sans-serif }
+    .wrap { width:min(100% - 32px,1120px); margin:0 auto; padding:24px 0 34px }
+    header { display:flex; justify-content:space-between; align-items:center; gap:20px; border-bottom:1px solid var(--line); padding:4px 0 17px; margin-bottom:16px }
+    .eyebrow { margin:0; color:var(--muted); font-size:.76rem; letter-spacing:.1em; text-transform:uppercase; font-weight:700 }
+    h1 { margin:5px 0 0; font-size:clamp(1.6rem,4vw,2.35rem); line-height:1.12; letter-spacing:-.025em }
+    .badge { flex:none; border:1px solid var(--line); background:#fff; color:var(--muted); padding:7px 11px; border-radius:999px; font-size:.78rem }
+    .intro { max-width:850px; color:var(--ink); margin:0 0 17px }
+    .panel { background:var(--white); border:1px solid var(--line); border-radius:14px; padding:19px; box-shadow:0 6px 24px #15283f0a }
+    .controls { display:flex; align-items:center; flex-wrap:wrap; gap:10px 17px; margin-bottom:15px }
+    .control-label { font-weight:700 }
+    .switches { display:flex; gap:8px; flex-wrap:wrap }
+    button, select, input { font:inherit }
+    button { cursor:pointer }
+    .mode,.nav-button { border:1px solid #b9c4cc; background:#fff; color:var(--ink); border-radius:8px; padding:8px 13px; font-weight:700 }
+    .mode[aria-pressed="true"] { background:var(--navy); border-color:var(--navy); color:#fff }
+    button:focus-visible,input:focus-visible,select:focus-visible { outline:3px solid #79b9bb; outline-offset:2px }
+    .connection-status { margin-left:auto; color:var(--muted); font-size:.88rem; font-weight:700 }
+    .steps { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:7px; margin:0 0 17px; padding:0; border:0 }
+    .step-tab { display:flex; align-items:center; gap:8px; min-width:0; border:1px solid var(--line); border-radius:9px; background:#fff; color:var(--ink); text-align:left; padding:8px; font-size:.83rem }
+    .step-tab .step-index { flex:none; display:grid; place-items:center; width:24px; height:24px; border-radius:50%; background:#edf0f2; color:var(--muted); font-size:.75rem; font-weight:700 }
+    .step-tab[aria-current="step"] { border-color:var(--teal); background:var(--pale-teal); color:var(--navy); font-weight:700 }
+    .step-tab[aria-current="step"] .step-index { background:var(--teal); color:#fff }
+    .stage { display:grid; grid-template-columns:minmax(0,1fr) minmax(68px,.35fr) minmax(0,1fr) minmax(68px,.35fr) minmax(0,1fr); align-items:stretch; gap:9px }
+    .node { min-height:112px; padding:13px; border:1px solid var(--line); border-radius:10px; background:#fff; display:flex; flex-direction:column; transition:background-color .2s,border-color .2s,transform .2s,box-shadow .2s }
+    .node h2 { margin:0 0 3px; font-size:.98rem }
+    .node p { margin:0; color:var(--muted); font-size:.84rem }
+    .node-index { margin-bottom:10px; color:var(--muted); font-size:.73rem; font-weight:700; letter-spacing:.05em }
+    .node.attacker { background:#fcf6f4 }
+    .node.active { border-color:#9bb9bb; box-shadow:0 0 0 2px #087f8314; transform:translateY(-2px) }
+    .node.attacker.active { background:var(--pale-red); border-color:#e3a69c; box-shadow:0 0 0 2px #d9503e15 }
+    .node.server.active { background:var(--pale-teal); border-color:#9acbc8 }
+    .node.blocked { background:var(--pale-teal); border-color:#9acbc8 }
+    .path { display:flex; flex-direction:column; justify-content:center; gap:8px; color:#acb7bf; font-size:.72rem; text-align:center }
+    .path-line { display:flex; align-items:center; gap:4px }
+    .path-line::before { content:""; height:2px; background:currentColor; flex:1 }
+    .path-line::after { content:"›"; font-size:1.45rem; line-height:.5 }
+    .path-line.reverse { transform:rotate(180deg) }
+    .path-line.reverse span { transform:rotate(180deg) }
+    .path.active { color:var(--teal) }
+    .path-label { display:block; margin-top:3px; color:var(--muted); font-size:.67rem; line-height:1.15 }
+    .step-content { display:grid; grid-template-columns:minmax(0,1fr) minmax(310px,.95fr); gap:20px; border-top:1px solid var(--line); margin-top:17px; padding-top:17px }
+    .step-summary { min-width:0 }
+    .step-kicker { margin:0 0 5px; color:var(--teal); font-weight:700; font-size:.76rem; letter-spacing:.08em; text-transform:uppercase }
+    .step-summary h2 { font-size:1.3rem; line-height:1.2; margin:0 0 7px }
+    .step-summary>p:not(.step-kicker) { margin:0; color:var(--ink) }
+    .input-group { margin-top:13px }
+    label { display:block; margin-bottom:5px; font-weight:700; font-size:.88rem }
+    input[type="text"],select { display:block; width:100%; border:1px solid #b9c4cc; border-radius:8px; padding:9px 10px; color:var(--navy); background:#fff }
+    .hint { margin:7px 0 0; color:var(--muted); font-size:.8rem }
+    .attack-controls { display:none; margin-top:12px; padding:12px 13px; border-left:3px solid var(--red); background:#fcf6f4; border-radius:0 8px 8px 0 }
+    .attack-controls.visible { display:block }
+    .form-check { display:flex; align-items:flex-start; gap:9px; margin:0; cursor:pointer }
+    .form-check input { flex:none; width:17px; height:17px; margin:3px 0 0; accent-color:var(--red) }
+    .form-check span { font-size:.9rem; font-weight:700 }
+    .form-check:has(input:disabled) { color:var(--muted); cursor:not-allowed }
+    .replacement-wrap { display:none; margin:10px 0 0 26px }
+    .replacement-wrap.visible { display:block }
+    .replacement-wrap label { font-size:.8rem; color:var(--muted) }
+    .technical { min-width:0; background:#f4f6f7; border:1px solid var(--line); border-radius:10px; padding:13px }
+    .technical h3 { margin:0 0 8px; font-size:.78rem; color:var(--muted); letter-spacing:.05em; text-transform:uppercase }
+    .protocol-label { margin:0 0 6px; color:var(--muted); font-size:.78rem }
+    .protocol { margin:0; padding:11px; border-radius:7px; background:#15283f; color:#f5f7f8; font:.82rem/1.5 Consolas,"Courier New",monospace; white-space:pre-wrap; overflow-wrap:anywhere; min-height:106px }
+    .technical-result { margin:10px 0 0; padding-top:9px; border-top:1px solid var(--line); color:var(--ink); font-size:.84rem }
+    .technical-result strong { color:var(--navy) }
+    .technical-result.protected strong { color:var(--teal) }
+    .technical-result.alert strong { color:#a83d31 }
+    .navigation { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:16px; border-top:1px solid var(--line); padding-top:14px }
+    .nav-group { display:flex; align-items:center; gap:9px }
+    .nav-button.primary { background:var(--teal); border-color:var(--teal); color:#fff }
+    .nav-button:hover:not(:disabled) { filter:brightness(.96) }
+    .nav-button:disabled { color:#9ba7b0; border-color:#d9dfe2; cursor:not-allowed }
+    .step-count { color:var(--muted); font-size:.86rem; font-variant-numeric:tabular-nums }
+    .note { margin:13px 0 0; color:var(--muted); font-size:.8rem }
+    @media(max-width:900px) { .steps { grid-template-columns:repeat(3,minmax(0,1fr)) } }
+    @media(max-width:700px) {
+      .wrap { width:min(100% - 22px,560px); padding-top:17px }
+      header { align-items:flex-start }
+      .badge { max-width:130px; text-align:center; font-size:.7rem; padding:5px 8px }
+      .panel { padding:13px }
+      .connection-status { flex-basis:100%; margin:0 }
+      .steps { grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px }
+      .step-tab { padding:7px; font-size:.8rem }
+      .stage { grid-template-columns:1fr; gap:6px }
+      .node { min-height:auto; padding:10px; display:grid; grid-template-columns:34px 1fr; column-gap:8px }
+      .node-index { grid-row:span 2; margin:0; align-self:center }
+      .node h2 { margin:0 }
+      .node p { grid-column:2 }
+      .path { min-height:25px; flex-direction:row; justify-content:center; gap:10px }
+      .path-line { width:min(36%,110px) }
+      .path-label { margin:0; min-width:70px; text-align:left }
+      .step-content { grid-template-columns:1fr; gap:13px; margin-top:14px; padding-top:14px }
+      .navigation { align-items:flex-start; flex-direction:column }
+      .nav-group { width:100%; justify-content:space-between }
+      .nav-button { padding:8px 10px }
+    }
+    @media(prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none !important; animation:none !important } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div><p class="eyebrow">Interaktive Netzwerksimulation</p><h1>Technischer Ablauf eines MitM-Angriffs</h1></div>
+      <span class="badge">Modell · ohne Netzwerkzugriff</span>
+    </header>
+    <p class="intro">Wähle HTTP oder HTTPS/TLS und verfolge den Datenweg. Die Simulation zeigt, welche Protokolldaten ein Angreifer sehen oder verändern kann.</p>
+    <section class="panel" aria-label="Technische Schritt-für-Schritt-Simulation">
+      <div class="controls">
+        <span class="control-label" id="mode-label">Verbindung:</span>
+        <div class="switches" role="group" aria-labelledby="mode-label">
+          <button class="mode" id="http" type="button" aria-pressed="true">HTTP</button>
+          <button class="mode" id="https" type="button" aria-pressed="false">HTTPS / TLS</button>
+        </div>
+        <span class="connection-status" id="connection-status" aria-live="polite">HTTP · Klartext</span>
+      </div>
+      <div class="steps" role="group" aria-label="Simulationsschritt">
+        <button class="step-tab" data-step="0" type="button"><span class="step-index">1</span><span>Position</span></button>
+        <button class="step-tab" data-step="1" type="button"><span class="step-index">2</span><span>DNS</span></button>
+        <button class="step-tab" data-step="2" type="button"><span class="step-index">3</span><span>Verbindung</span></button>
+        <button class="step-tab" data-step="3" type="button"><span class="step-index">4</span><span>Abfangen</span></button>
+        <button class="step-tab" data-step="4" type="button"><span class="step-index">5</span><span>Eingriff</span></button>
+        <button class="step-tab" data-step="5" type="button"><span class="step-index">6</span><span>Weiterleitung</span></button>
+      </div>
+      <div class="stage" aria-label="Datenweg">
+        <article class="node" id="device-node"><span class="node-index">01</span><h2>Client</h2><p id="device-status">Erstellt die Anfrage</p></article>
+        <div class="path" id="left-path" aria-label="Datenweg zwischen Client und möglichem Angreifer">
+          <div class="path-line"><span>Anfrage</span></div><div class="path-line reverse"><span>Antwort</span></div><span class="path-label">Netzwerkweg</span>
+        </div>
+        <article class="node attacker" id="attacker-node"><span class="node-index">02</span><h2>Angreifer / Relay</h2><p id="attacker-status">Noch nicht im Datenweg</p></article>
+        <div class="path" id="right-path" aria-label="Datenweg zwischen möglichem Angreifer und Server">
+          <div class="path-line"><span>Weiterleitung</span></div><div class="path-line reverse"><span>Antwort</span></div><span class="path-label">Netzwerkweg</span>
+        </div>
+        <article class="node server" id="server-node"><span class="node-index">03</span><h2>Webserver</h2><p id="server-status">Wartet auf Anfrage</p></article>
+      </div>
+      <div class="step-content">
+        <div class="step-summary">
+          <p class="step-kicker" id="step-kicker">Schritt 1 von 6</p>
+          <h2 id="step-title">Position im Datenweg</h2>
+          <p id="step-description">Ein MitM-Angriff setzt voraus, dass der Angreifer den Netzwerkverkehr erreichen kann. Wähle ein Beispiel für diesen Zugang.</p>
+          <div class="input-group" id="entry-group">
+            <label for="entry-method">Möglicher Zugang</label>
+            <select id="entry-method">
+              <option value="Unsicheres oder manipuliertes WLAN">Unsicheres oder manipuliertes WLAN</option>
+              <option value="Kompromittierter Router">Kompromittierter Router</option>
+              <option value="Manipulierte Gerätezuordnung im lokalen Netz">Manipulierte Gerätezuordnung im lokalen Netz</option>
+            </select>
+            <p class="hint">Die Simulation erklärt die Wirkung, führt aber keine Netzwerkaktionen aus.</p>
+          </div>
+          <div class="input-group">
+            <label for="original-message">Beispielnachricht</label>
+            <input id="original-message" type="text" maxlength="90" value="Treffen um 15 Uhr" autocomplete="off">
+          </div>
+          <div class="attack-controls" id="attack-controls">
+            <label class="form-check" for="alter-message"><input id="alter-message" type="checkbox"><span>HTTP-Nachricht im Relay verändern</span></label>
+            <div class="replacement-wrap" id="replacement-wrap">
+              <label for="replacement-message">Geänderter Inhalt beim Server</label>
+              <input id="replacement-message" type="text" maxlength="90" value="Treffen um 18 Uhr" autocomplete="off">
+            </div>
+            <p class="hint" id="attack-hint">Beispielinhalt – es werden keine Daten übertragen.</p>
+          </div>
+        </div>
+        <aside class="technical" aria-live="polite">
+          <h3 id="technical-heading">Technische Sicht</h3>
+          <p class="protocol-label" id="protocol-label">Voraussetzung</p>
+          <pre class="protocol" id="protocol-view"></pre>
+          <p class="technical-result" id="technical-result"><strong>Ergebnis:</strong> <span id="result-view"></span></p>
+        </aside>
+      </div>
+      <div class="navigation">
+        <div class="nav-group">
+          <button class="nav-button" id="previous" type="button" disabled>Zurück</button>
+          <span class="step-count" id="step-count" aria-live="polite">1 von 6</span>
+          <button class="nav-button primary" id="next" type="button">Weiter</button>
+        </div>
+        <button class="nav-button" id="reset" type="button">Neu starten</button>
+      </div>
+    </section>
+    <p class="note">TLS schützt Inhalte bei gültiger Zertifikatsprüfung. Ein HTTPS-MitM erfordert typischerweise ein vertrauenswürdiges Zwischenzertifikat, ein kompromittiertes Endgerät oder das Umgehen einer Zertifikatswarnung. Die Demo modelliert nur den normalen TLS-Schutzpfad.</p>
+  </main>
+  <script>
+    (() => {
+      const steps = [
+        { title: 'Position im Datenweg' },
+        { title: 'DNS-Auflösung' },
+        { title: 'Verbindung und TLS-Prüfung' },
+        { title: 'Anfrage abfangen' },
+        { title: 'Inhalt verändern' },
+        { title: 'Weiterleiten und antworten' }
+      ];
+      let currentStep = 0;
+      let secure = false;
+      const http = document.getElementById('http');
+      const https = document.getElementById('https');
+      const originalInput = document.getElementById('original-message');
+      const replacementInput = document.getElementById('replacement-message');
+      const alterInput = document.getElementById('alter-message');
+      const entryMethod = document.getElementById('entry-method');
+      const controls = document.getElementById('attack-controls');
+      const replacementWrap = document.getElementById('replacement-wrap');
+      const attackerNode = document.getElementById('attacker-node');
+      const deviceNode = document.getElementById('device-node');
+      const serverNode = document.getElementById('server-node');
+      const leftPath = document.getElementById('left-path');
+      const rightPath = document.getElementById('right-path');
+      const attackerStatus = document.getElementById('attacker-status');
+      const deviceStatus = document.getElementById('device-status');
+      const serverStatus = document.getElementById('server-status');
+      const protocolView = document.getElementById('protocol-view');
+      const resultView = document.getElementById('result-view');
+      const technicalResult = document.getElementById('technical-result');
+
+      function protocolFor(original, replacement, altered) {
+        if (currentStep === 0) {
+          return {
+            label: 'Voraussetzung · Zugang zum Datenweg',
+            lines: 'Beispiel: ' + entryMethod.value + '\nClient ──► Angreifer/Relay ──► Webserver',
+            result: 'Der Angreifer muss zwischen die Kommunikationspartner gelangen oder den Verkehr anderweitig kontrollieren.'
+          };
+        }
+        if (currentStep === 1) {
+          return {
+            label: 'Namensauflösung · DNS',
+            lines: 'Query:  A portal.example?  → Resolver\nReply:  203.0.113.42',
+            result: 'DNS ordnet dem Namen eine IP-Adresse zu. DNS allein bestätigt nicht die Identität des Webservers.'
+          };
+        }
+        if (currentStep === 2) {
+          return secure ? {
+            label: 'Verbindungsaufbau · HTTPS / TLS',
+            lines: 'ClientHello  →\n←  ServerHello + Zertifikatsnachweis\nBrowser prüft: Name · Vertrauenskette · Gültigkeit\nDanach: Schlüsselvereinbarung → TLS',
+            result: 'Bei gültiger Prüfung ist die Verbindung authentifiziert und verschlüsselt.'
+          } : {
+            label: 'Verbindungsaufbau · HTTP über TCP',
+            lines: 'TCP: SYN  →\n     ←  SYN-ACK\n     ACK  →\nHTTP-Anwendungsdaten folgen unverschlüsselt.',
+            result: 'TCP baut den Transportkanal auf. Es bestätigt nicht kryptografisch, wer den Webserver betreibt.'
+          };
+        }
+        if (currentStep === 3) {
+          return secure ? {
+            label: 'Abfangen · TLS-Datensatz',
+            lines: '17 03 03  …  [verschlüsselte Nutzdaten]\nApplication Data · Inhalt nicht lesbar',
+            result: 'Das Relay kann Datenpakete weiterreichen. Die Nachricht bleibt im normalen TLS-Modell verborgen.'
+          } : {
+            label: 'Abfangen · HTTP-Anfrage',
+            lines: 'POST /nachricht HTTP/1.1\nHost: portal.example\n\n' + original,
+            result: 'HTTP überträgt die Anfrage im Klartext. Ein Relay im Datenweg kann den Inhalt lesen.'
+          };
+        }
+        if (currentStep === 4) {
+          return secure ? {
+            label: 'Manipulationsversuch · TLS',
+            lines: 'Ciphertext + Authentifizierungstag\nÄnderung am Datensatz → Prüfung schlägt fehl',
+            result: 'TLS erkennt die Veränderung und verwirft die manipulierten Daten.',
+            protected: true
+          } : {
+            label: 'Manipulation · HTTP im Relay',
+            lines: 'Vorher: ' + original + '\nNachher: ' + (altered ? replacement : original) + '\nRelay erstellt die HTTP-Anfrage neu.',
+            result: altered ? 'Der Server erhält den geänderten Beispieltext.' : 'Aktiviere die Änderung, um die Wirkung im Modell zu sehen.',
+            alert: altered
+          };
+        }
+        return secure ? {
+          label: 'Weiterleitung · HTTPS / TLS',
+          lines: 'Client ──► TLS-Datensätze ──► Server\n         [Relay leitet weiter]\nServerantwort kommt verschlüsselt zurück.',
+          result: 'Der Server erhält die ursprüngliche Nachricht. Das Relay kann TLS-Inhalte nicht still verändern.',
+          protected: true
+        } : {
+          label: 'Weiterleitung · HTTP',
+          lines: 'Relay ──► POST /nachricht ──► Server\nBody: ' + (altered ? replacement : original) + '\n← Antwort läuft über das Relay zurück.',
+          result: altered ? 'Der Server verarbeitet den veränderten Beispieltext.' : 'Der Server erhält den ursprünglichen Beispieltext.',
+          alert: altered
+        };
+      }
+
+      function update() {
+        const original = originalInput.value.trim() || '—';
+        const replacement = replacementInput.value.trim() || '—';
+        const altered = !secure && alterInput.checked;
+        const delivered = currentStep >= 5;
+
+        http.setAttribute('aria-pressed', String(!secure));
+        https.setAttribute('aria-pressed', String(secure));
+        document.getElementById('connection-status').textContent = secure ? 'HTTPS / TLS · Nutzdaten verschlüsselt' : 'HTTP · Klartext';
+        document.getElementById('step-kicker').textContent = 'Schritt ' + (currentStep + 1) + ' von ' + steps.length;
+        document.getElementById('step-title').textContent = steps[currentStep].title;
+        document.getElementById('step-count').textContent = (currentStep + 1) + ' von ' + steps.length;
+        document.getElementById('previous').disabled = currentStep === 0;
+        document.getElementById('next').disabled = currentStep === steps.length - 1;
+        document.querySelectorAll('.step-tab').forEach((button, index) => {
+          button.setAttribute('aria-current', index === currentStep ? 'step' : 'false');
+        });
+
+        let description = '';
+        if (currentStep === 0) description = 'Ein MitM-Angriff setzt voraus, dass der Angreifer den Netzwerkverkehr erreichen kann. Wähle ein Beispiel für diesen Zugang.';
+        if (currentStep === 1) description = 'Vor dem Webaufruf fragt der Client einen DNS-Resolver nach der IP-Adresse des Hostnamens.';
+        if (currentStep === 2) description = secure
+          ? 'Nach dem TCP-Aufbau handeln Client und Server TLS aus. Der Browser prüft, ob das Zertifikat zur Domain passt und vertrauenswürdig ist.'
+          : 'Der Client baut eine TCP-Verbindung auf. HTTP sendet anschließend Anwendungsdaten ohne Verschlüsselung oder kryptografische Serverprüfung.';
+        if (currentStep === 3) description = secure
+          ? 'Das Relay kann weiterhin Pakete abfangen. Bei TLS sieht es jedoch verschlüsselte Datensätze statt des Nachrichtentextes.'
+          : 'Das Relay liest die abgefangene HTTP-Anfrage. Der Text liegt unverändert lesbar im Datenstrom.';
+        if (currentStep === 4) description = secure
+          ? 'Eine Änderung am TLS-Datensatz passt nicht mehr zur kryptografischen Authentifizierung. TLS erkennt sie und verwirft die Daten.'
+          : 'Bei HTTP kann das Relay den Nachrichtentext ändern und die Anfrage an den Server weiterleiten.';
+        if (currentStep === 5) description = secure
+          ? 'Das Relay reicht die TLS-Datensätze unverändert weiter. Die Antwort kommt ebenfalls verschlüsselt beim Client an.'
+          : 'Das Relay sendet die Anfrage an den Server und leitet dessen Antwort zurück. Der Server verarbeitet den Text, den er erhalten hat.';
+        document.getElementById('step-description').textContent = description;
+
+        deviceNode.classList.toggle('active', currentStep <= 2);
+        attackerNode.classList.toggle('active', currentStep === 0 || currentStep === 3 || currentStep === 4);
+        attackerNode.classList.toggle('blocked', secure && currentStep === 4);
+        serverNode.classList.toggle('active', delivered);
+        leftPath.classList.toggle('active', currentStep >= 1);
+        rightPath.classList.toggle('active', currentStep >= 1);
+        deviceStatus.textContent = currentStep < 3 ? 'Erstellt DNS- und Webanfrage' : 'Sendet Anfrage';
+        attackerStatus.textContent = currentStep === 0 ? entryMethod.value : secure ? 'Relay · TLS-Daten nicht lesbar' : altered ? 'Liest / ändert HTTP-Inhalt' : 'Relay im Datenweg';
+        serverStatus.textContent = delivered ? (altered ? 'Erhält geänderten Text' : 'Erhält Originaltext') : 'Wartet auf Anfrage';
+
+        controls.classList.toggle('visible', currentStep === 4);
+        alterInput.disabled = secure || currentStep !== 4;
+        replacementInput.disabled = secure || currentStep !== 4 || !alterInput.checked;
+        replacementWrap.classList.toggle('visible', currentStep === 4 && alterInput.checked);
+        document.getElementById('attack-hint').textContent = secure
+          ? 'TLS schützt die Integrität der übertragenen Nutzdaten.'
+          : 'Nur Beispieltext: Es werden keine Daten an ein Netzwerk gesendet.';
+        const protocol = protocolFor(original, replacement, altered);
+        document.getElementById('protocol-label').textContent = protocol.label;
+        protocolView.textContent = protocol.lines;
+        resultView.textContent = protocol.result;
+        technicalResult.classList.toggle('protected', Boolean(protocol.protected));
+        technicalResult.classList.toggle('alert', Boolean(protocol.alert));
+      }
+
+      http.addEventListener('click', () => { secure = false; update(); });
+      https.addEventListener('click', () => { secure = true; update(); });
+      document.getElementById('previous').addEventListener('click', () => { currentStep = Math.max(0, currentStep - 1); update(); });
+      document.getElementById('next').addEventListener('click', () => { currentStep = Math.min(steps.length - 1, currentStep + 1); update(); });
+      document.getElementById('reset').addEventListener('click', () => { currentStep = 0; alterInput.checked = false; update(); });
+      document.querySelectorAll('.step-tab').forEach(button => button.addEventListener('click', () => { currentStep = Number(button.dataset.step); update(); }));
+      [originalInput, replacementInput, alterInput, entryMethod].forEach(element => element.addEventListener('input', update));
+      alterInput.addEventListener('change', update);
+      entryMethod.addEventListener('change', update);
+      update();
+    })();
+  </script>
+</body>
+</html>
+

@@ -1,8 +1,8 @@
 # Technischer Ablauf eines MitM-Angriffs
 
-Schrittweise Lernsimulation zu DNS, TCP, HTTP und TLS.
+Öffentliche Simulation: https://penguingim007.github.io/mitm-protokoll-simulation/
 
-Die App veranschaulicht auf sechs Stationen den Zugang zum Datenweg, die Namensauflösung, den Verbindungsaufbau, das Abfangen, den möglichen Eingriff und die Weiterleitung. Sie vergleicht HTTP mit HTTPS/TLS.
+Die App zeigt auf sechs Stationen den Zugang zum Datenweg, DNS, den TCP- und TLS-Verbindungsaufbau, das Abfangen, einen möglichen Eingriff und die Weiterleitung. HTTP und HTTPS/TLS lassen sich vergleichen.
 
 Die Simulation führt keine Netzwerkaktionen aus und sendet keine Daten. Alle Inhalte sind Beispieldaten.
 
